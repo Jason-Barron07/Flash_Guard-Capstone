@@ -1,0 +1,23 @@
+{
+  "name": "flash_guard-capstone",
+  "version": "1.0.0",
+  "description": "Flash-Guard is a fintech quality engineering framework for automating Web UI, API, Database, Mobile, and E2E testing using Playwright, Postman, SQL, Appium, Docker, and Azure DevOps to validate security, compliance, and transactional integrity.",
+  "main": "index.js",
+  "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Jason-Barron07/Flash_Guard-Capstone.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Jason-Barron07/Flash_Guard-Capstone/issues"
+  },
+  "homepage": "https://github.com/Jason-Barron07/Flash_Guard-Capstone#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "@types/node": "^25.7.0"
+  }
+}
