@@ -142,11 +142,17 @@ jobs:
 
   mobile-automation:
     name: Mobile Automation
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Enable KVM access for emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -262,6 +268,7 @@ jobs:
           target: google_apis
           profile: pixel_7
           emulator-boot-timeout: 1200
+          disable-linux-hw-accel: false
           disable-animations: true
           script: |
             set -e
@@ -274,6 +281,11 @@ jobs:
             export ANDROID_UDID=emulator-5554
             export ANDROID_APP_PACKAGE=com.anonymous.flashguadmobileapp
             export ANDROID_APP_ACTIVITY=.MainActivity
+
+            # Recover ADB if it gets stuck in offline mode during boot
+            adb kill-server || true
+            adb start-server
+            adb wait-for-device
 
             echo "Connected devices:"
             adb devices
