@@ -1,0 +1,39 @@
+trigger:
+  - main
+  - develop
+
+pool:
+  vmImage: ubuntu-latest
+
+stages:
+  - stage: LintAndBuild
+    jobs:
+      - job: BuildStack
+        steps:
+          - script: docker compose up -d --build
+            displayName: Build and start offline stack
+          - script: curl --fail http://localhost:4000/health
+            displayName: Verify API health
+
+  - stage: LayerValidation
+    dependsOn: LintAndBuild
+    jobs:
+      - job: RunLayerCommands
+        steps:
+          - script: npm run test:web
+          - script: npm run test:api
+          - script: npm run test:mobile
+          - script: npm run test:e2e
+          - script: npm run verify:db
+
+  - stage: Evidence
+    dependsOn: LayerValidation
+    jobs:
+      - job: BundleArtifacts
+        steps:
+          - script: npm run report:bundle
+          - task: PublishBuildArtifacts@1
+            inputs:
+              PathtoPublish: reports/evidence
+              ArtifactName: flash-guard-evidence
+              publishLocation: Container

@@ -1,35 +1,34 @@
 {
-  "name": "flash_guard-capstone",
+  "name": "flash-guard",
   "version": "1.0.0",
-  "description": "Flash-Guard is a fintech quality engineering framework for automating Web UI, API, Database, Mobile, and E2E testing using Playwright, Postman, SQL, Appium, Docker, and Azure DevOps to validate security, compliance, and transactional integrity.",
-  "main": "index.js",
-  "scripts": {},
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/Jason-Barron07/Flash_Guard-Capstone.git"
+  "private": true,
+  "description": "Offline fintech apps, API, and DB for QE students.",
+  "scripts": {
+    "stack:up": "npm run stack:up:containers && npm --prefix mobile run start",
+    "stack:up:containers": "docker compose up -d --build && node scripts/seed-after-up.mjs",
+    "stack:up:local": "docker compose up -d --build && node scripts/init-local-db.mjs",
+    "db:init-local": "node scripts/init-local-db.mjs",
+    "stack:down": "docker compose down -v",
+    "stack:logs": "docker compose logs -f",
+    "emulator:tune": "powershell -ExecutionPolicy Bypass -File scripts/tune-android-emulator.ps1",
+    "db:reset-seed": "docker compose --profile seed run --rm app-seed",
+    "api:health": "curl http://localhost:4000/health",
+    "verify:db": "node scripts/run-db-verifications.mjs",
+    "report:bundle": "node scripts/build-evidence-bundle.mjs",
+    "test:install-browsers": "npx playwright install",
+    "test:web": "npx playwright test",
+    "test:api": "npx newman run tests/api/flash-guard.postman_collection.json -e tests/api/flash-guard-environment.json --reporters cli,html --reporter-html-export reports/newman.html",
+    "test:mobile": "echo \"Students run Android emulator automation against http://10.0.2.2:4000\"",
+    "test:mobile:install": "npm --prefix tests/mobile install",
+    "test:mobile:auth": "npm --prefix tests/mobile run test:auth",
+    "test:e2e": "echo \"Students run cross-layer E2E and DB validations\"",
+    "test:all": "npm run test:install-browsers && npm run test:web && npm run test:api && npm run verify:db",
+    "postinstall": "npx playwright install --with-deps"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "bugs": {
-    "url": "https://github.com/Jason-Barron07/Flash_Guard-Capstone/issues"
-  },
-  "homepage": "https://github.com/Jason-Barron07/Flash_Guard-Capstone#readme",
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
-    "@eslint/json": "^1.2.0",
-    "@playwright/test": "^1.60.0",
-    "@stylistic/eslint-plugin": "^5.10.0",
-    "@types/mssql": "^12.3.0",
-    "@types/node": "^25.7.0",
-    "eslint": "^10.3.0",
-    "eslint-plugin-import-x": "^4.16.2",
-    "eslint-plugin-jsdoc": "^62.9.0",
-    "globals": "^17.6.0",
-    "typescript-eslint": "^8.59.3"
-  },
-  "dependencies": {
-    "mssql": "^12.6.0"
+    "typescript": "^5.0.0",
+    "@playwright/test": "^1.40.0",
+    "playwright": "^1.40.0",
+    "newman": "^5.3.0"
   }
 }

@@ -1,0 +1,28 @@
+stages:
+  - up
+  - validate
+  - evidence
+
+stack_up:
+  stage: up
+  script:
+    - docker compose up -d --build
+    - curl --fail http://localhost:4000/health
+
+layer_validate:
+  stage: validate
+  script:
+    - npm run test:web
+    - npm run test:api
+    - npm run test:mobile
+    - npm run test:e2e
+    - npm run verify:db
+
+evidence_bundle:
+  stage: evidence
+  script:
+    - npm run report:bundle
+  artifacts:
+    when: always
+    paths:
+      - reports/evidence/
