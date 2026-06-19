@@ -1,0 +1,25 @@
+-- Show every account with its stored balance
+-- and compare it to the total credits minus debits.
+
+SELECT
+    a.id,
+    a.full_name,
+    a.balance,
+
+    SUM(
+        CASE
+            WHEN le.entry_type = 'credit' THEN le.amount
+            WHEN le.entry_type = 'debit' THEN -le.amount
+            ELSE 0
+        END
+    ) AS CalculatedBalance
+
+FROM accounts a
+
+LEFT JOIN ledger_entries le
+ON a.id = le.account_id
+
+GROUP BY
+    a.id,
+    a.full_name,
+    a.balance;
