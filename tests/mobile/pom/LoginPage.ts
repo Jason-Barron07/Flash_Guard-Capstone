@@ -46,6 +46,17 @@ export class LoginPage {
     'android=new UiSelector().textContains("Sign In")'
   ];
 
+  private readonly biometricModalSelectors = [
+    'android=new UiSelector().text("Face Check")',
+    'android=new UiSelector().textContains("Auto sign-in")',
+    'android=new UiSelector().textContains("Camera permission is needed")'
+  ];
+
+  private readonly biometricCancelSelectors = [
+    'android=new UiSelector().text("Cancel")',
+    'android=new UiSelector().textContains("Cancel")'
+  ];
+
   private readonly dashboardVerificationSelectors = [
     "~dashboard-screen",
     "id=com.anonymous.flashguadmobileapp:id/dashboard",
@@ -148,6 +159,8 @@ export class LoginPage {
     const endTime = Date.now() + timeoutMs;
 
     while (Date.now() < endTime) {
+      await this.dismissBiometricModalIfPresent();
+
       const dashboardMarker = await this.getFirstDisplayed(this.dashboardVerificationSelectors, 700);
       if (dashboardMarker) {
         return "dashboard";
@@ -170,6 +183,25 @@ export class LoginPage {
     }
 
     return null;
+  }
+
+  async dismissBiometricModalIfPresent(): Promise<boolean> {
+    const modalVisible = await this.getFirstDisplayed(this.biometricModalSelectors, 1200);
+    if (!modalVisible) {
+      return false;
+    }
+
+    const cancelButton = await this.getFirstDisplayed(this.biometricCancelSelectors, 1200);
+    if (cancelButton) {
+      await cancelButton.click().catch(() => undefined);
+      await this.driver.pause(800);
+      return true;
+    }
+
+    // If no explicit cancel button is reachable, dismiss with back key as a fallback.
+    await this.driver.back().catch(() => undefined);
+    await this.driver.pause(800);
+    return true;
   }
 
   async dismissAlertIfPresent(): Promise<string | null> {
@@ -233,6 +265,8 @@ export class LoginPage {
   }
 
   async ensureOnLoginScreen(timeoutMs = 10000): Promise<boolean> {
+    await this.dismissBiometricModalIfPresent();
+
     if (await this.isLoginScreenDisplayed(timeoutMs)) {
       return true;
     }
@@ -299,6 +333,7 @@ export class LoginPage {
   }
 
   async login(email: string, password: string): Promise<void> {
+    await this.dismissBiometricModalIfPresent();
     await this.dismissAlertIfPresent();
     await this.ensureOnLoginScreen(12000);
     await this.enterEmail(email);

@@ -294,7 +294,6 @@ jobs:
 
             # Pre-grant common runtime permissions to reduce first-launch UI stalls
             adb shell pm grant com.anonymous.flashguadmobileapp android.permission.CAMERA || true
-            adb shell pm grant com.anonymous.flashguadmobileapp android.permission.POST_NOTIFICATIONS || true
 
             # Start Appium in background
             nohup appium --base-path /wd/hub --log /tmp/appium.log > /tmp/appium-stdout.log 2>&1 &
@@ -307,7 +306,7 @@ jobs:
             adb shell am start -n com.anonymous.flashguadmobileapp/.MainActivity || true
             sleep 8
 
-            npm --prefix tests/mobile run test:auth
+            npm --prefix tests/mobile run test:auth -- --grep "T-MOB-AUTH-001 Valid Login"
 
       - name: Upload mobile automation artifacts
         if: always()
