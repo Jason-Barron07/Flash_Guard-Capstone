@@ -292,6 +292,10 @@ jobs:
             # Install the APK
             adb install -r mobile/android/app/build/outputs/apk/debug/app-debug.apk
 
+            # Pre-grant common runtime permissions to reduce first-launch UI stalls
+            adb shell pm grant com.anonymous.flashguadmobileapp android.permission.CAMERA || true
+            adb shell pm grant com.anonymous.flashguadmobileapp android.permission.POST_NOTIFICATIONS || true
+
             # Start Appium in background
             nohup appium --base-path /wd/hub --log /tmp/appium.log > /tmp/appium-stdout.log 2>&1 &
 
@@ -301,7 +305,7 @@ jobs:
 
             # Launch the app so it is in the foreground before the session starts
             adb shell am start -n com.anonymous.flashguadmobileapp/.MainActivity || true
-            sleep 3
+            sleep 8
 
             npm --prefix tests/mobile run test
 
