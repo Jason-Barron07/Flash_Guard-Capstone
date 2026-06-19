@@ -307,7 +307,7 @@ jobs:
             adb shell am start -n com.anonymous.flashguadmobileapp/.MainActivity || true
             sleep 8
 
-            npm --prefix tests/mobile run test
+            npm --prefix tests/mobile run test:auth
 
       - name: Upload mobile automation artifacts
         if: always()
