@@ -1,3 +1,4 @@
+-- SQL-001: Verify account balance 
 -- Show every account with its stored balance
 -- and compare it to the total credits minus debits.
 
@@ -23,3 +24,29 @@ GROUP BY
     a.id,
     a.full_name,
     a.balance;
+
+--SQL-002: Verify no duplicate accounts for same email
+-- Find duplicate email addresses.
+
+SELECT
+    email,
+    COUNT(*) AS NumberOfAccounts
+
+FROM accounts
+
+GROUP BY email
+
+HAVING COUNT(*) > 1;
+
+
+--SQL-003: Verify account soft-delete
+-- Display all inactive accounts.
+-- If soft delete is working correctly,
+-- these records should still exist.
+
+SELECT *
+
+FROM accounts
+
+WHERE is_active = 0;
+
