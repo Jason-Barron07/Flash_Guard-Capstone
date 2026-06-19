@@ -18,6 +18,20 @@ const isUiAutomatorCrash = (error: unknown): boolean => {
     || normalized.includes("timed out after");
 };
 
+const warmUpAccessibility = async (session: Browser): Promise<void> => {
+  for (let attempt = 1; attempt <= 6; attempt++) {
+    try {
+      await session.$$("android.widget.FrameLayout");
+      return;
+    } catch (error) {
+      if (!isUiAutomatorCrash(error) || attempt === 6) {
+        throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    }
+  }
+};
+
 const createHealthySession = async (capabilities: Record<string, string | number | boolean>): Promise<Browser> => {
   let lastError: unknown;
 
@@ -34,6 +48,8 @@ const createHealthySession = async (capabilities: Record<string, string | number
       }).catch(() => undefined);
 
       await session.getWindowRect();
+      await session.pause(3000);
+      await warmUpAccessibility(session);
       return session;
     } catch (error) {
       lastError = error;
