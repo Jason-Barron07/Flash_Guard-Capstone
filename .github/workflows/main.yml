@@ -262,6 +262,14 @@ jobs:
 
       - name: Run mobile automation on Android emulator
         uses: reactivecircus/android-emulator-runner@v2
+        env:
+          APPIUM_HOST: 127.0.0.1
+          APPIUM_PORT: "4723"
+          APPIUM_PATH: /wd/hub
+          ANDROID_DEVICE_NAME: Android Emulator
+          ANDROID_UDID: emulator-5554
+          ANDROID_APP_PACKAGE: com.anonymous.flashguadmobileapp
+          ANDROID_APP_ACTIVITY: .MainActivity
         with:
           api-level: 34
           arch: x86_64
@@ -272,15 +280,6 @@ jobs:
           disable-animations: true
           script: |
             set -e
-
-            # Export Appium / Android env vars so tests pick them up
-            export APPIUM_HOST=127.0.0.1
-            export APPIUM_PORT=4723
-            export APPIUM_PATH=/wd/hub
-            export ANDROID_DEVICE_NAME="Android Emulator"
-            export ANDROID_UDID=emulator-5554
-            export ANDROID_APP_PACKAGE=com.anonymous.flashguadmobileapp
-            export ANDROID_APP_ACTIVITY=.MainActivity
 
             # Recover ADB if it gets stuck in offline mode during boot
             adb kill-server || true
@@ -298,18 +297,7 @@ jobs:
 
             # Wait until Appium /status endpoint responds
             echo "Waiting for Appium to be ready..."
-            for i in $(seq 1 30); do
-              if curl -fsS http://127.0.0.1:4723/wd/hub/status > /dev/null 2>&1; then
-                echo "Appium is ready"
-                break
-              fi
-              if [ "$i" -eq 30 ]; then
-                echo "Appium did not start in time"
-                cat /tmp/appium.log || true
-                exit 1
-              fi
-              sleep 2
-            done
+            for i in $(seq 1 30); do if curl -fsS http://127.0.0.1:4723/wd/hub/status > /dev/null 2>&1; then echo "Appium is ready"; break; fi; if [ "$i" -eq 30 ]; then echo "Appium did not start in time"; cat /tmp/appium.log || true; exit 1; fi; sleep 2; done
 
             # Launch the app so it is in the foreground before the session starts
             adb shell am start -n com.anonymous.flashguadmobileapp/.MainActivity || true
