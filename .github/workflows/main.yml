@@ -6,9 +6,21 @@ on:
   pull_request:
     branches: [main, develop]
   workflow_dispatch:
+
+env:
+  NODE_VERSION: "20"
+  DB_NAME: FlashGuard
+  DB_USER: sa
+  DB_PASSWORD: YourStrong!Passw0rd
+  JWT_SECRET: gh-ci-jwt-secret
+  API_PORT: "4000"
+  WEB_PORT: "3000"
+  MOBILE_PORT: "3001"
+
 jobs:
-  quality-checks:
-    name: Run Tests, Lint, Build Docker
+  web-automation:
+    name: Web Automation
+    if: false
     runs-on: ubuntu-latest
 
     steps:
@@ -18,37 +30,332 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Prepare CI env file
+        run: |
+          cat > .env << EOF
+          BASE_URL=http://localhost:3000/
+          APP_USERNAME=alice@flashguard.local
+          APP_PASSWORD=offline-demo
+          DB_NAME=${DB_NAME}
+          DB_USER=${DB_USER}
+          DB_PASSWORD=${DB_PASSWORD}
+          JWT_SECRET=${JWT_SECRET}
+          API_PORT=${API_PORT}
+          WEB_PORT=${WEB_PORT}
+          MOBILE_PORT=${MOBILE_PORT}
+          EOF
 
-      - name: Run linting
-        run: npm run lint
+      - name: Create Docker compose CI override
+        run: |
+          cat > docker-compose.ci.yml << 'EOF'
+          services:
+            sqlserver:
+              image: mcr.microsoft.com/mssql/server:2022-latest
+              environment:
+                ACCEPT_EULA: Y
+                MSSQL_SA_PASSWORD: ${DB_PASSWORD}
+              ports:
+                - "1433:1433"
+              healthcheck:
+                test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/1433'"]
+                interval: 10s
+                timeout: 5s
+                retries: 20
 
-      - name: Run Playwright tests
-        run: npx playwright test
+            api:
+              environment:
+                DB_HOST: sqlserver
+                DB_PORT: "1433"
+              depends_on:
+                sqlserver:
+                  condition: service_healthy
+          EOF
 
-      - name: Build Docker image
-        run: docker build -t fintech-qe-app .
+      - name: Start offline stack
+        run: docker compose -p fgci-web -f docker-compose.yml -f docker-compose.ci.yml up -d --build
 
-      - name: Upload Playwright report
+      - name: Initialize and seed SQL Server
+        run: |
+          set -e
+          for attempt in $(seq 1 20); do
+            if docker run --rm --network fgci-web_default -v "$PWD/db/init:/db/init" mcr.microsoft.com/mssql-tools:latest /bin/bash -c \
+              "/opt/mssql-tools/bin/sqlcmd -C -S sqlserver,1433 -U ${DB_USER} -P '${DB_PASSWORD}' -d master -i /db/init/01-schema.sql && \
+               /opt/mssql-tools/bin/sqlcmd -C -S sqlserver,1433 -U ${DB_USER} -P '${DB_PASSWORD}' -d ${DB_NAME} -i /db/init/99-reset-and-seed.sql"; then
+              echo "Database initialization complete"
+              break
+            fi
+
+            if [ "$attempt" -eq 20 ]; then
+              echo "Database initialization failed after 20 attempts"
+              exit 1
+            fi
+
+            sleep 10
+          done
+
+      - name: Verify API health
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://localhost:${API_PORT}/health; then
+              echo "API is healthy"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "API health check failed"
+          docker compose -p fgci-web -f docker-compose.yml -f docker-compose.ci.yml logs
+          exit 1
+
+      - name: Install UI automation dependencies
+        run: npm ci --prefix tests/ui
+
+      - name: Install Playwright browser dependencies
+        run: npx --prefix tests/ui playwright install --with-deps chromium
+
+      - name: Run web automation
+        run: npm --prefix tests/ui run test
+
+      - name: Upload web automation artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
-          path: playwright-report/
+          name: web-automation-artifacts
+          path: |
+            tests/ui/artifacts/**
 
-  deploy:
-    name: Deploy Application
+      - name: Upload stack logs (web)
+        if: always()
+        run: docker compose -p fgci-web -f docker-compose.yml -f docker-compose.ci.yml logs > web-stack.log
+
+      - name: Publish stack logs artifact (web)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-stack-logs
+          path: web-stack.log
+
+      - name: Tear down stack
+        if: always()
+        run: docker compose -p fgci-web -f docker-compose.yml -f docker-compose.ci.yml down -v
+
+  mobile-automation:
+    name: Mobile Automation
     runs-on: ubuntu-latest
-    needs: quality-checks
-
-    if: github.ref == 'refs/heads/main'
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Deploy placeholder
-        run: echo "Deploying application..."
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Prepare CI env file
+        run: |
+          cat > .env << EOF
+          BASE_URL=http://localhost:3000/
+          APP_USERNAME=alice@flashguard.local
+          APP_PASSWORD=offline-demo
+          DB_NAME=${DB_NAME}
+          DB_USER=${DB_USER}
+          DB_PASSWORD=${DB_PASSWORD}
+          JWT_SECRET=${JWT_SECRET}
+          API_PORT=${API_PORT}
+          WEB_PORT=${WEB_PORT}
+          MOBILE_PORT=${MOBILE_PORT}
+          EOF
+
+      - name: Create Docker compose CI override
+        run: |
+          cat > docker-compose.ci.yml << 'EOF'
+          services:
+            sqlserver:
+              image: mcr.microsoft.com/mssql/server:2022-latest
+              environment:
+                ACCEPT_EULA: Y
+                MSSQL_SA_PASSWORD: ${DB_PASSWORD}
+              ports:
+                - "1433:1433"
+              healthcheck:
+                test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/1433'"]
+                interval: 10s
+                timeout: 5s
+                retries: 20
+
+            api:
+              environment:
+                DB_HOST: sqlserver
+                DB_PORT: "1433"
+              depends_on:
+                sqlserver:
+                  condition: service_healthy
+          EOF
+
+      - name: Start offline stack
+        run: docker compose -p fgci-mobile -f docker-compose.yml -f docker-compose.ci.yml up -d --build
+
+      - name: Initialize and seed SQL Server
+        run: |
+          set -e
+          for attempt in $(seq 1 20); do
+            if docker run --rm --network fgci-mobile_default -v "$PWD/db/init:/db/init" mcr.microsoft.com/mssql-tools:latest /bin/bash -c \
+              "/opt/mssql-tools/bin/sqlcmd -C -S sqlserver,1433 -U ${DB_USER} -P '${DB_PASSWORD}' -d master -i /db/init/01-schema.sql && \
+               /opt/mssql-tools/bin/sqlcmd -C -S sqlserver,1433 -U ${DB_USER} -P '${DB_PASSWORD}' -d ${DB_NAME} -i /db/init/99-reset-and-seed.sql"; then
+              echo "Database initialization complete"
+              break
+            fi
+
+            if [ "$attempt" -eq 20 ]; then
+              echo "Database initialization failed after 20 attempts"
+              exit 1
+            fi
+
+            sleep 10
+          done
+
+      - name: Verify API health
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://localhost:${API_PORT}/health; then
+              echo "API is healthy"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "API health check failed"
+          docker compose -p fgci-mobile -f docker-compose.yml -f docker-compose.ci.yml logs
+          exit 1
+
+      - name: Install mobile app dependencies
+        run: npm ci --prefix mobile
+
+      - name: Build Android debug APK
+        env:
+          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+        run: |
+          echo "sdk.dir=${ANDROID_SDK_ROOT}" > mobile/android/local.properties
+          chmod +x mobile/android/gradlew
+          (cd mobile/android && ./gradlew assembleDebug --no-daemon)
+
+      - name: Install mobile automation dependencies
+        run: npm ci --prefix tests/mobile
+
+      - name: Install Appium and UiAutomator2 driver
+        run: |
+          npm install -g appium
+          appium driver install uiautomator2
+
+      - name: Run mobile automation on Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          profile: pixel_7
+          emulator-boot-timeout: 1200
+          disable-animations: true
+          script: |
+            set -e
+
+            # Export Appium / Android env vars so tests pick them up
+            export APPIUM_HOST=127.0.0.1
+            export APPIUM_PORT=4723
+            export APPIUM_PATH=/wd/hub
+            export ANDROID_DEVICE_NAME="Android Emulator"
+            export ANDROID_UDID=emulator-5554
+            export ANDROID_APP_PACKAGE=com.anonymous.flashguadmobileapp
+            export ANDROID_APP_ACTIVITY=.MainActivity
+
+            echo "Connected devices:"
+            adb devices
+
+            # Install the APK
+            adb install -r mobile/android/app/build/outputs/apk/debug/app-debug.apk
+
+            # Start Appium in background
+            nohup appium --base-path /wd/hub --log /tmp/appium.log > /tmp/appium-stdout.log 2>&1 &
+
+            # Wait until Appium /status endpoint responds
+            echo "Waiting for Appium to be ready..."
+            for i in $(seq 1 30); do
+              if curl -fsS http://127.0.0.1:4723/wd/hub/status > /dev/null 2>&1; then
+                echo "Appium is ready"
+                break
+              fi
+              if [ "$i" -eq 30 ]; then
+                echo "Appium did not start in time"
+                cat /tmp/appium.log || true
+                exit 1
+              fi
+              sleep 2
+            done
+
+            # Launch the app so it is in the foreground before the session starts
+            adb shell am start -n com.anonymous.flashguadmobileapp/.MainActivity || true
+            sleep 3
+
+            npm --prefix tests/mobile run test
+
+      - name: Upload mobile automation artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-automation-artifacts
+          path: |
+            tests/mobile/artifacts/**
+            /tmp/appium.log
+            /tmp/appium-stdout.log
+          if-no-files-found: warn
+
+      - name: Upload stack logs (mobile)
+        if: always()
+        run: docker compose -p fgci-mobile -f docker-compose.yml -f docker-compose.ci.yml logs > mobile-stack.log
+
+      - name: Publish stack logs artifact (mobile)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-stack-logs
+          path: mobile-stack.log
+
+      - name: Tear down stack
+        if: always()
+        run: docker compose -p fgci-mobile -f docker-compose.yml -f docker-compose.ci.yml down -v
+
+  evidence:
+    name: Evidence Bundle
+    runs-on: ubuntu-latest
+    needs:
+      - mobile-automation
+    if: always()
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Build evidence bundle
+        run: npm run report:bundle
+
+      - name: Publish evidence bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flash-guard-evidence
+          path: reports/evidence
