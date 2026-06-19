@@ -15,5 +15,8 @@ export const androidCapabilities: Record<string, string | number | boolean> = {
   "appium:noReset": true,
   "appium:newCommandTimeout": 180,
   "appium:autoGrantPermissions": true,
-  "appium:uiautomator2ServerLaunchTimeout": 120000
+  "appium:uiautomator2ServerLaunchTimeout": 120000,
+  "appium:uiautomator2ServerReadTimeout": 120000,
+  "appium:adbExecTimeout": 120000,
+  "appium:waitForIdleTimeout": 0
 };

@@ -83,7 +83,9 @@ export class LoginPage {
     const message = error instanceof Error ? error.message : String(error);
     const normalized = message.toLowerCase();
     return normalized.includes("instrumentation process is not running")
-      || normalized.includes("cannot be proxied to uiautomator2 server");
+      || normalized.includes("cannot be proxied to uiautomator2 server")
+      || normalized.includes("waiting for the root accessibilitynodeinfo")
+      || normalized.includes("timed out after");
   }
 
   private async getFirstDisplayed(selectors: string[], timeoutMs = 7000): Promise<ChainablePromiseElement | null> {
