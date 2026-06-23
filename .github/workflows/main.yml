@@ -20,7 +20,6 @@ env:
 jobs:
   web-automation:
     name: Web Automation
-    if: false
     runs-on: ubuntu-latest
 
     steps:
@@ -306,7 +305,7 @@ jobs:
             adb shell am start -n com.anonymous.flashguadmobileapp/.MainActivity || true
             sleep 8
 
-            npm --prefix tests/mobile run test:auth -- --grep "T-MOB-AUTH-001 Valid Login"
+            npm --prefix tests/mobile run test
 
       - name: Upload mobile automation artifacts
         if: always()
@@ -338,6 +337,7 @@ jobs:
     name: Evidence Bundle
     runs-on: ubuntu-latest
     needs:
+      - web-automation
       - mobile-automation
     if: always()
 

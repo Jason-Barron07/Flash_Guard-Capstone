@@ -4,6 +4,7 @@ export class LoginPage {
   constructor(private readonly driver: Browser) {}
 
   private readonly appPackage = process.env.ANDROID_APP_PACKAGE || "com.anonymous.flashguadmobileapp";
+  private readonly appActivity = process.env.ANDROID_APP_ACTIVITY || ".MainActivity";
 
   private readonly emailSelectors = [
     "~email-input",
@@ -241,7 +242,21 @@ export class LoginPage {
 
   async relaunchApp(): Promise<void> {
     await this.driver.terminateApp(this.appPackage).catch(() => undefined);
-    await this.driver.activateApp(this.appPackage);
+
+    // Some emulator/device states keep the app task backgrounded after activateApp.
+    // startActivity guarantees MainActivity is brought to foreground for locator checks.
+    await this.driver.startActivity(this.appPackage, this.appActivity).catch(() => undefined);
+    await this.driver.activateApp(this.appPackage).catch(() => undefined);
+
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const currentPackage = await this.driver.getCurrentPackage().catch(() => "");
+      if (currentPackage === this.appPackage) {
+        return;
+      }
+
+      await this.driver.startActivity(this.appPackage, this.appActivity).catch(() => undefined);
+      await this.driver.pause(700);
+    }
   }
 
   async clearAppDataAndRelaunch(): Promise<void> {

@@ -4,7 +4,15 @@ export class TransferPage {
   constructor(private readonly driver: Browser) {}
 
   private readonly transferTabSelectors = [
-    'android=new UiSelector().text("Transact")'
+    'android=new UiSelector().text("Transact")',
+    'android=new UiSelector().textContains("Transact")',
+    'android=new UiSelector().text("Transfer")',
+    'android=new UiSelector().textContains("Transfer")'
+  ];
+
+  private readonly transferQuickActionSelectors = [
+    'android=new UiSelector().text("Send Money")',
+    'android=new UiSelector().textContains("Send Money")'
   ];
 
   private readonly transferScreenMarkers = [
@@ -21,11 +29,18 @@ export class TransferPage {
   ];
 
   private readonly amountInputSelectors = [
-    'xpath=//android.widget.TextView[@text="Amount (ZAR)"]/following::android.widget.EditText[1]'
+    'android=new UiSelector().className("android.widget.EditText").instance(0)',
+    'xpath=//android.widget.TextView[contains(@text,"Amount")]/following::android.widget.EditText[1]'
   ];
 
   private readonly totalAmountValueSelectors = [
-    'xpath=//android.widget.TextView[@text="Total Amount"]/following::android.widget.TextView[1]'
+    'xpath=//android.widget.TextView[contains(@text,"Total Amount")]/following::android.widget.TextView[1]'
+  ];
+
+  private readonly selectedRecipientSelectors = [
+    'android=new UiSelector().resourceId("com.anonymous.flashguadmobileapp:id/recipient")',
+    'android=new UiSelector().textContains("Wallet")',
+    'android=new UiSelector().className("android.widget.TextView").index(3)'
   ];
 
   private readonly reviewTransactionButtonSelectors = [
@@ -45,17 +60,33 @@ export class TransferPage {
     'android=new UiSelector().text("Approve")'
   ];
 
+  private isUiAutomatorTemporaryError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error);
+    const normalized = message.toLowerCase();
+    return normalized.includes("instrumentation process is not running")
+      || normalized.includes("cannot be proxied to uiautomator2 server")
+      || normalized.includes("waiting for the root accessibilitynodeinfo")
+      || normalized.includes("timed out after");
+  }
+
   private async getFirstDisplayed(selectors: string[], timeoutMs = 7000): Promise<ChainablePromiseElement | null> {
     const endTime = Date.now() + timeoutMs;
 
     while (Date.now() < endTime) {
       for (const selector of selectors) {
-        const element = await this.driver.$(selector);
-        if (await element.isExisting().catch(() => false) && await element.isDisplayed().catch(() => false)) {
-          return element;
+        try {
+          const element = await this.driver.$(selector);
+          if (await element.isExisting().catch(() => false) && await element.isDisplayed().catch(() => false)) {
+            return element;
+          }
+        } catch (error) {
+          if (!this.isUiAutomatorTemporaryError(error)) {
+            throw error;
+          }
+          await this.driver.pause(700);
         }
       }
-      await this.driver.pause(200);
+      await this.driver.pause(350);
     }
 
     return null;
@@ -80,13 +111,30 @@ export class TransferPage {
       return true;
     }
 
-    const transferTab = await this.getFirstDisplayed(this.transferTabSelectors, 4000);
-    if (!transferTab) {
-      return false;
+    const endTime = Date.now() + timeoutMs;
+    while (Date.now() < endTime) {
+      const transferTab = await this.getFirstDisplayed(this.transferTabSelectors, 1200);
+      if (transferTab) {
+        await transferTab.click().catch(() => undefined);
+      }
+
+      if (await this.isTransferScreenDisplayed(1800)) {
+        return true;
+      }
+
+      const quickAction = await this.getFirstDisplayed(this.transferQuickActionSelectors, 1200);
+      if (quickAction) {
+        await quickAction.click().catch(() => undefined);
+      }
+
+      if (await this.isTransferScreenDisplayed(1800)) {
+        return true;
+      }
+
+      await this.driver.pause(350);
     }
 
-    await transferTab.click();
-    return this.isTransferScreenDisplayed(timeoutMs);
+    return false;
   }
 
   async selectRecipient(name: string, timeoutMs = 8000): Promise<boolean> {
@@ -125,6 +173,15 @@ export class TransferPage {
     }
 
     return (await totalAmount.getText().catch(() => "")).trim();
+  }
+
+  async readSelectedRecipient(timeoutMs = 5000): Promise<string> {
+    const recipientElement = await this.getFirstDisplayed(this.selectedRecipientSelectors, timeoutMs);
+    if (!recipientElement) {
+      throw new Error("Selected recipient not visible");
+    }
+
+    return (await recipientElement.getText().catch(() => "")).trim();
   }
 
   async submitTransfer(): Promise<void> {

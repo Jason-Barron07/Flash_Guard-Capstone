@@ -15,11 +15,26 @@ This folder contains mobile automation tests implemented with Playwright Test Ru
 npm --prefix tests/mobile install
 ```
 
+## Run preflight only
+
+Use this to validate local or CI runner readiness before launching tests:
+
+```powershell
+npm --prefix tests/mobile run preflight
+```
+
+Preflight checks:
+
+- Appium status endpoint using `APPIUM_HOST`, `APPIUM_PORT`, and `APPIUM_PATH`
+- Android device connectivity using `ANDROID_UDID` (default `emulator-5554`)
+
 ## Run auth test
 
 ```powershell
 npm --prefix tests/mobile run test:auth
 ```
+
+All `test*` scripts run preflight automatically and fail fast with actionable errors.
 
 ## Run full mobile suite
 

@@ -9,6 +9,7 @@ export class DashboardPage {
     'android=new UiSelector().text("Dashboard")'
   ];
 
+  private readonly appActivity = process.env.ANDROID_APP_ACTIVITY || ".MainActivity";
   private readonly dashboardLoadMarkers = [
     'android=new UiSelector().textContains("Welcome back")',
     'android=new UiSelector().text("Total Net Worth")',
@@ -50,7 +51,19 @@ export class DashboardPage {
 
   async relaunchApp(): Promise<void> {
     await this.driver.terminateApp(this.appPackage).catch(() => undefined);
-    await this.driver.activateApp(this.appPackage);
+        
+    await this.driver.startActivity(this.appPackage, this.appActivity).catch(() => undefined);
+    await this.driver.activateApp(this.appPackage).catch(() => undefined);
+        
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const currentPackage = await this.driver.getCurrentPackage().catch(() => "");
+      if (currentPackage === this.appPackage) {
+        return;
+      }
+            
+      await this.driver.startActivity(this.appPackage, this.appActivity).catch(() => undefined);
+      await this.driver.pause(700);
+    }
   }
 
   async scrollToRecentTransactions(timeoutMs = 10000): Promise<boolean> {
