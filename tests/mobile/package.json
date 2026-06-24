@@ -1,0 +1,22 @@
+{
+  "name": "flash-guard-mobile-tests",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Playwright + Appium mobile tests for Flash Guard",
+  "scripts": {
+    "preflight": "node scripts/preflight.mjs",
+    "test": "npm run preflight && playwright test -c playwright.appium.config.ts",
+    "test:auth": "npm run preflight && playwright test -c playwright.appium.config.ts specs/auth.spec.ts",
+    "test:dashboard": "npm run preflight && playwright test -c playwright.appium.config.ts specs/dashboard.spec.ts",
+    "test:balance-history": "npm run preflight && playwright test -c playwright.appium.config.ts specs/balance-history.spec.ts",
+    "test:transfer": "npm run preflight && playwright test -c playwright.appium.config.ts specs/transfer.spec.ts",
+    "report": "playwright show-report artifacts/playwright-report",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.54.1",
+    "@types/node": "^22.16.5",
+    "typescript": "^5.8.3",
+    "webdriverio": "^9.19.2"
+  }
+}

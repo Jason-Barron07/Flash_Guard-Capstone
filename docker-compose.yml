@@ -1,0 +1,68 @@
+name: flash-guard
+
+services:
+  # NOTE: The database runs outside Compose. The seed utility connects to host-local SQL Server.
+  # If you want to run the DB in Docker again, restore the `sqlserver`, `db-init`, and `app-seed` services.
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: fg-api
+    working_dir: /app
+    environment:
+      NODE_ENV: development
+      PORT: ${API_PORT}
+      # When running containers on your machine, point to the host's SQL Server using host.docker.internal
+      DB_HOST: host.docker.internal
+      DB_PORT: "1433"
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+    ports:
+      - "${API_PORT}:${API_PORT}"
+    # No DB init dependency when using host-local SQL Server
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: fg-web
+    ports:
+      - "${WEB_PORT}:80"
+    depends_on:
+      api:
+        condition: service_started
+
+  mobile:
+    build:
+      context: ./mobile
+      dockerfile: Dockerfile
+    container_name: fg-mobile
+    ports:
+      - "${MOBILE_PORT}:80"
+    depends_on:
+      api:
+        condition: service_started
+
+  app-seed:
+    image: mcr.microsoft.com/mssql-tools:latest
+    container_name: fg-app-seed
+    profiles: ["seed"]
+    environment:
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+    volumes:
+      - ./db/init:/db/init
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: >
+      /bin/bash -c "
+      /opt/mssql-tools/bin/sqlcmd -C -S host.docker.internal,1433 -U ${DB_USER} -P '${DB_PASSWORD}' -d master -i /db/init/01-schema.sql &&
+      /opt/mssql-tools/bin/sqlcmd -C -S host.docker.internal,1433 -U ${DB_USER} -P '${DB_PASSWORD}' -d ${DB_NAME} -i /db/init/99-reset-and-seed.sql
+      "
+
+volumes:
+  sqlserver_data:
